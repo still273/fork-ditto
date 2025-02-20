@@ -13,7 +13,7 @@ from .dataset import DittoDataset
 from torch.utils import data
 from transformers import AutoModel, AdamW, get_linear_schedule_with_warmup
 from tensorboardX import SummaryWriter
-from apex import amp
+from torch.cuda import amp
 
 lm_mp = {'roberta': 'roberta-base',
          'distilbert': 'distilbert-base-uncased'}
@@ -105,7 +105,7 @@ def evaluate(model, iterator, threshold=None):
         return f1, best_th
 
 
-def train_step(train_iter, model, optimizer, scheduler, hp):
+def train_step(train_iter, model, optimizer, scheduler, hp, scaler=None):
     """Perform a single training step
 
     Args:
@@ -122,23 +122,40 @@ def train_step(train_iter, model, optimizer, scheduler, hp):
     # criterion = nn.MSELoss()
     for i, batch in enumerate(train_iter):
         optimizer.zero_grad()
-
-        if len(batch) == 2:
-            x, y = batch
-            prediction = model(x)
-        else:
-            x1, x2, y = batch
-            prediction = model(x1, x2)
-
-        loss = criterion(prediction, y.to(model.device))
-
         if hp.fp16:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
+            with amp.autocast():
+                if len(batch) == 2:
+                    x, y = batch
+                    prediction = model(x)
+                else:
+                    x1, x2, y = batch
+                    prediction = model(x1, x2)
+
+
+                loss = criterion(prediction, y.to(model.device))
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
         else:
+            if len(batch) == 2:
+                x, y = batch
+                prediction = model(x)
+            else:
+                x1, x2, y = batch
+                prediction = model(x1, x2)
+
+            loss = criterion(prediction, y.to(model.device))
             loss.backward()
-        optimizer.step()
-        scheduler.step()
+            optimizer.step()
+            scheduler.step()
+
+        #if hp.fp16:
+        #    with amp.scale_loss(loss, optimizer) as scaled_loss:
+        #        scaled_loss.backward()
+        #else:
+        #    loss.backward()
+        #optimizer.step()
+        #scheduler.step()
         if i % 10 == 0: # monitoring
             print(f"step: {i}, loss: {loss.item()}")
         del loss
@@ -165,27 +182,32 @@ def train(trainset, validset, testset, run_tag, hp):
                                  shuffle=True,
                                  num_workers=0,
                                  collate_fn=padder)
-    valid_iter = data.DataLoader(dataset=validset,
-                                 batch_size=hp.batch_size*16,
-                                 shuffle=False,
-                                 num_workers=0,
-                                 collate_fn=padder)
-    test_iter = data.DataLoader(dataset=testset,
-                                 batch_size=hp.batch_size*16,
-                                 shuffle=False,
-                                 num_workers=0,
-                                 collate_fn=padder)
-
+    if type(validset)!= type(None):
+        valid_iter = data.DataLoader(dataset=validset,
+                                     batch_size=hp.batch_size*16,
+                                     shuffle=False,
+                                     num_workers=0,
+                                     collate_fn=padder)
+    if type(testset) != type(None):
+        test_iter = data.DataLoader(dataset=testset,
+                                     batch_size=hp.batch_size*16,
+                                     shuffle=False,
+                                     num_workers=0,
+                                     collate_fn=padder)
     # initialize model, optimizer, and LR scheduler
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = DittoModel(device=device,
                        lm=hp.lm,
                        alpha_aug=hp.alpha_aug)
-    model = model.cuda()
+    if device == 'cuda':
+        model = model.cuda()
     optimizer = AdamW(model.parameters(), lr=hp.lr)
 
     if hp.fp16:
-        model, optimizer = amp.initialize(model, optimizer, opt_level='O2')
+        scaler = amp.GradScaler()
+        #model, optimizer = amp.initialize(model, optimizer, opt_level='O2')
+    else:
+        scaler=None
     num_steps = (len(trainset) // hp.batch_size) * hp.n_epochs
     scheduler = get_linear_schedule_with_warmup(optimizer,
                                                 num_warmup_steps=0,
@@ -196,14 +218,23 @@ def train(trainset, validset, testset, run_tag, hp):
 
     best_dev_f1 = best_test_f1 = 0.0
     for epoch in range(1, hp.n_epochs+1):
+        print('starting with epoch 1')
         # train
         model.train()
-        train_step(train_iter, model, optimizer, scheduler, hp)
+        train_step(train_iter, model, optimizer, scheduler, hp, scaler)
 
         # eval
         model.eval()
-        dev_f1, th = evaluate(model, valid_iter)
-        test_f1 = evaluate(model, test_iter, threshold=th)
+        if type(validset)!= type(None):
+            dev_f1, th = evaluate(model, valid_iter)
+        else:
+            dev_f1 = 0.0
+            th = 0.5
+        if type(testset) != type(None):
+            test_f1 = evaluate(model, test_iter, threshold=th)
+        else:
+            test_f1 = 0.0
+
 
         if dev_f1 > best_dev_f1:
             best_dev_f1 = dev_f1

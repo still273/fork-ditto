@@ -77,6 +77,7 @@ class DittoDataset(data.Dataset):
         # augment if da is set
         if self.da is not None:
             combined = self.augmenter.augment_sent(left + ' [SEP] ' + right, self.da)
+            #print(combined)
             left, right = combined.split(' [SEP] ')
             x_aug = self.tokenizer.encode(text=left,
                                       text_pair=right,

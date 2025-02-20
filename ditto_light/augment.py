@@ -40,16 +40,25 @@ class Augmenter(object):
             if pos1 < 0:
                 return tokens, labels
             new_tokens = tokens[:pos1] + tokens[pos2+1:]
-            new_labels = tokens[:pos1] + labels[pos2+1:]
+            new_labels = labels[:pos1] + labels[pos2+1:]
+
+            if '[SEP]' not in new_tokens and '[SEP]' in tokens:
+                new_tokens = tokens[:pos1] +['[SEP]']+ tokens[pos2 + 1:]
+                new_labels = labels[:pos1] +['<SEP>']+ labels[pos2 + 1:]
         elif 'swap' in op:
             span_len = random.randint(2, 4)
             pos1, pos2 = self.sample_span(tokens, labels, span_len=span_len)
             if pos1 < 0:
                 return tokens, labels
             sub_arr = tokens[pos1:pos2+1]
-            random.shuffle(sub_arr)
+            #random.shuffle(sub_arr)
+            shuffle_order =list(range(len(sub_arr)))
+            random.shuffle(shuffle_order)
+            sub_arr = [sub_arr[i] for i in shuffle_order]
+            sub_labels = [labels[i] for i in shuffle_order]
             new_tokens = tokens[:pos1] + sub_arr + tokens[pos2+1:]
-            new_labels = tokens[:pos1] + ['O'] * (pos2 - pos1 + 1) + labels[pos2+1:]
+            #new_labels = tokens[:pos1] + ['O'] * (pos2 - pos1 + 1) + labels[pos2+1:]
+            new_labels = labels[:pos1] + sub_labels + labels[pos2+1:]
         elif 'drop_len' in op:
             # drop tokens below a certain length
             all_lens = [len(token) for token, label in \
@@ -126,10 +135,16 @@ class Augmenter(object):
                     col_lens[i] = col_starts[i + 1] - pos
                     col_ends[i] = col_starts[i + 1] - 1
 
-                if tokens[col_ends[i]] == '[SEP]':
-                    col_ends[i] -= 1
-                    col_lens[i] -= 1
+                if '[SEP]' in tokens[col_starts[i]:col_ends[i]+1]:
+                    sep_pos = tokens[col_starts[i]:col_ends[i]+1].index('[SEP]')
+                    col_ends[i] = col_starts[i] + sep_pos - 1
+                    col_lens[i] = sep_pos
                     break
+
+                #if tokens[col_ends[i]] == '[SEP]':
+                #    col_ends[i] -= 1
+                #    col_lens[i] -= 1
+                #    break
             candidates = [i for i, le in enumerate(col_lens) if le > 0]
             if len(candidates) >= 2:
                 idx1, idx2 = random.sample(candidates,k=2)
@@ -169,10 +184,13 @@ class Augmenter(object):
                 else:
                     col_lens[i] = col_starts[i + 1] - pos
                     col_ends[i] = col_starts[i + 1] - 1
-
-                if tokens[col_ends[i]] == '[SEP]':
-                    col_ends[i] -= 1
-                    col_lens[i] -= 1
+                if '[SEP]' in tokens[col_starts[i]:col_ends[i]+1]:
+                    sep_pos = tokens[col_starts[i]:col_ends[i]+1].index('[SEP]')
+                    col_ends[i] = col_starts[i] + sep_pos - 1
+                    col_lens[i] = sep_pos
+                #if tokens[col_ends[i]] == '[SEP]':
+                #    col_ends[i] -= 1
+                #    col_lens[i] -= 1
             candidates = [i for i, le in enumerate(col_lens) if le <= 8]
             if len(candidates) > 0:
                 idx = random.choice(candidates)
