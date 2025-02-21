@@ -72,6 +72,7 @@ def to_str(ent1, ent2, summarizer=None, max_len=256, dk_injector=None):
 
 def classify(sentence_pairs, model,
              lm='distilbert',
+             batch_size=None,
              max_len=256,
              threshold=None):
     """Apply the MRPC model.
@@ -91,8 +92,11 @@ def classify(sentence_pairs, model,
                            max_len=max_len,
                            lm=lm)
     # print(dataset[0])
+    if type(batch_size) == type(None):
+        batch_size = len(dataset)
+
     iterator = data.DataLoader(dataset=dataset,
-                               batch_size=len(dataset),
+                               batch_size=batch_size,
                                shuffle=False,
                                num_workers=0,
                                collate_fn=DittoDataset.pad)
@@ -100,20 +104,22 @@ def classify(sentence_pairs, model,
     # prediction
     all_probs = []
     all_logits = []
+    all_labels = []
     with torch.no_grad():
         # print('Classification')
         for i, batch in enumerate(iterator):
-            x, _ = batch
+            x, l = batch
             logits = model(x)
             probs = logits.softmax(dim=1)[:, 1]
             all_probs += probs.cpu().numpy().tolist()
             all_logits += logits.cpu().numpy().tolist()
+            all_labels += l.cpu().numpy().tolist()
 
     if threshold is None:
         threshold = 0.5
 
     pred = [1 if p > threshold else 0 for p in all_probs]
-    return pred, all_logits
+    return pred, all_logits, all_labels
 
 def predict(input_path, output_path, config,
             model,

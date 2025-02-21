@@ -218,7 +218,6 @@ def train(trainset, validset, testset, run_tag, hp):
 
     best_dev_f1 = best_test_f1 = 0.0
     for epoch in range(1, hp.n_epochs+1):
-        print('starting with epoch 1')
         # train
         model.train()
         train_step(train_iter, model, optimizer, scheduler, hp, scaler)
@@ -261,3 +260,4 @@ def train(trainset, validset, testset, run_tag, hp):
         writer.add_scalars(run_tag, scalars, epoch)
 
     writer.close()
+    return model
