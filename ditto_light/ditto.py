@@ -221,6 +221,7 @@ def train(trainset, validset, testset, run_tag, hp):
     best_dev_f1 = best_test_f1 = 0.0
     results = []
     best_epoch = []
+    t_start = time.process_time()
     for epoch in range(1, hp.n_epochs+1):
         t_epoch = time.process_time()
         # train
@@ -268,6 +269,9 @@ def train(trainset, validset, testset, run_tag, hp):
         scalars = {'f1': dev_f1,
                    't_f1': test_f1}
         writer.add_scalars(run_tag, scalars, epoch)
+
+        if t_test - t_start > 12*60*60:
+            break
 
     writer.close()
     results += [best_epoch]
