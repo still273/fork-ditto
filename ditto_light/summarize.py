@@ -36,7 +36,7 @@ class Summarizer:
         Store the index and vocabulary in self.idf and self.vocab.
         """
         fns = [self.config['trainset'],
-               #self.config['validset'],
+               self.config['validset'],
                self.config['testset']]
         content = []
         for fn in fns:

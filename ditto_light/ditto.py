@@ -87,7 +87,6 @@ def evaluate(model, iterator, threshold=None):
             probs = logits.softmax(dim=1)[:, 1]
             all_probs += probs.cpu().numpy().tolist()
             all_y += y.cpu().numpy().tolist()
-    print(len(all_probs))
     if threshold is not None:
         pred = [1 if p > threshold else 0 for p in all_probs]
         f1 = metrics.f1_score(all_y, pred)
@@ -221,6 +220,7 @@ def train(trainset, validset, testset, run_tag, hp):
 
     best_dev_f1 = best_test_f1 = 0.0
     results = []
+    best_epoch = []
     for epoch in range(1, hp.n_epochs+1):
         t_epoch = time.process_time()
         # train
@@ -242,10 +242,12 @@ def train(trainset, validset, testset, run_tag, hp):
             test_f1, test_p, test_r = 0.0, 0.0, 0.0
 
         t_test = time.process_time()
-        results += [[epoch, test_f1, test_p, test_r, t_train-t_epoch, t_valid-t_train, t_test-t_valid]]
+        curr_results = [epoch, test_f1, test_p, test_r, t_train-t_epoch, t_valid-t_train, t_test-t_valid]
+        results += [curr_results]
         if dev_f1 > best_dev_f1:
             best_dev_f1 = dev_f1
             best_test_f1 = test_f1
+            best_epoch = curr_results
             if hp.save_model:
                 # create the directory if not exist
                 directory = os.path.join(hp.logdir, hp.task)
@@ -268,4 +270,5 @@ def train(trainset, validset, testset, run_tag, hp):
         writer.add_scalars(run_tag, scalars, epoch)
 
     writer.close()
+    results += [best_epoch]
     return model, th, results
