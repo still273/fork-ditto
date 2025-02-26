@@ -270,7 +270,8 @@ def train(trainset, validset, testset, run_tag, hp):
                    't_f1': test_f1}
         writer.add_scalars(run_tag, scalars, epoch)
 
-        if t_test - t_start > 12*60*60:
+        if (t_test - t_start) + (t_test-t_epoch) > 8*60*60: #if running the next epoch would lead to a total runtime
+                                                            #higher than 8 hours, break.
             break
 
     writer.close()
