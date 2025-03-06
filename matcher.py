@@ -74,7 +74,7 @@ def classify(sentence_pairs, model,
              lm='distilbert',
              batch_size=None,
              max_len=256,
-             threshold=None):
+             threshold=None, return_embeddings=False):
     """Apply the MRPC model.
 
     Args:
@@ -105,11 +105,18 @@ def classify(sentence_pairs, model,
     all_probs = []
     all_logits = []
     all_labels = []
+    all_embs = []
     with torch.no_grad():
         # print('Classification')
         for i, batch in enumerate(iterator):
             x, l = batch
-            logits = model(x)
+            res = model(x, return_embeddings=return_embeddings)
+            if return_embeddings:
+                logits = res[0]
+                embeddings = res[1]
+                all_embs += embeddings.cpu().numpy().tolist()
+            else:
+                logits = res
             probs = logits.softmax(dim=1)[:, 1]
             all_probs += probs.cpu().numpy().tolist()
             all_logits += logits.cpu().numpy().tolist()
@@ -119,6 +126,8 @@ def classify(sentence_pairs, model,
         threshold = 0.5
 
     pred = [1 if p > threshold else 0 for p in all_probs]
+    if return_embeddings:
+        return pred, all_logits, all_labels, all_embs
     return pred, all_logits, all_labels
 
 def predict(input_path, output_path, config,

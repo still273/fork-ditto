@@ -37,7 +37,7 @@ class DittoModel(nn.Module):
         self.fc = torch.nn.Linear(hidden_size, 2)
 
 
-    def forward(self, x1, x2=None):
+    def forward(self, x1, x2=None, return_embeddings=False):
         """Encode the left, right, and the concatenation of left+right.
 
         Args:
@@ -61,6 +61,8 @@ class DittoModel(nn.Module):
         else:
             enc = self.bert(x1)[0][:, 0, :]
 
+        if return_embeddings:
+            return self.fc(enc), enc
         return self.fc(enc) # .squeeze() # .sigmoid()
 
 
