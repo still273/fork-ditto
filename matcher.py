@@ -288,10 +288,10 @@ def load_model(task, path, lm, use_gpu, fp16=True):
     if not os.path.exists(checkpoint):
         raise ModelNotFoundError(checkpoint)
 
-    configs = json.load(open('configs.json'))
-    configs = {conf['name'] : conf for conf in configs}
-    config = configs[task]
-    config_list = [config]
+    #configs = json.load(open('configs.json'))
+    #configs = {conf['name'] : conf for conf in configs}
+    #config = configs[task]
+    #config_list = [config]
 
     if use_gpu:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -307,7 +307,7 @@ def load_model(task, path, lm, use_gpu, fp16=True):
     #if fp16 and 'cuda' in device:
     #    model = amp.initialize(model, opt_level='O2')
 
-    return config, model
+    return  model
 
 
 if __name__ == "__main__":

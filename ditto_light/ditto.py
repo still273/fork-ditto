@@ -259,12 +259,12 @@ def train(trainset, validset, testsets, run_tag, hp):
             best_epoch = curr_results
             if hp.save_model:
                 # create the directory if not exist
-                directory = os.path.join(hp.logdir, hp.task)
+                directory = os.path.join(hp.logdir, hp.lm)
                 if not os.path.exists(directory):
                     os.makedirs(directory)
 
                 # save the checkpoints for each component
-                ckpt_path = os.path.join(hp.logdir, hp.task, 'model.pt')
+                ckpt_path = os.path.join(directory, 'model.pt')
                 ckpt = {'model': model.state_dict(),
                         'optimizer': optimizer.state_dict(),
                         'scheduler': scheduler.state_dict(),
