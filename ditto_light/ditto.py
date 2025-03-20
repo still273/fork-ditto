@@ -281,6 +281,19 @@ def train(trainset, validset, testsets, run_tag, hp):
         if (t_test - t_start) + (t_test - t_epoch) > 8*60*60: #if running the next epoch would lead to a total runtime
                                                             #higher than 8 hours, break.
             break
+    if hp.save_model and hp.last_epoch:
+        # create the directory if not exist
+        directory = os.path.join(hp.logdir, hp.lm)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        # save the checkpoints for each component
+        ckpt_path = os.path.join(directory, 'model.pt')
+        ckpt = {'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'scheduler': scheduler.state_dict(),
+                'epoch': epoch}
+        torch.save(ckpt, ckpt_path)
 
     writer.close()
     results += [best_epoch]
